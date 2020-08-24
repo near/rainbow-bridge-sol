@@ -4,6 +4,7 @@ steps:
       source ~/.nvm/nvm.sh
       source ~/.yarn/yarn.sh
       ./build_all.sh
+      git status
       changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
       if [ $$changed_files -gt 0 ]; then
         echo 'contract changed, please rebuild contract'
