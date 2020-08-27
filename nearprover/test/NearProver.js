@@ -11,6 +11,18 @@ contract('NearProver', function ([_, addr1]) {
         this.prover = await NearProver.new(this.bridge.address);
     });
 
+    it('should fail if block not on bridge', async function () {
+        const proof2 = borshifyOutcomeProof(require('./proof2.json'));
+        let revert = false;
+        try {
+            await this.prover.proveOutcome(proof2, 498)
+        } catch (e) {
+            revert = true;
+            expect(e.toString()).to.have.string('block proof is not valid');
+        }
+        expect(revert).to.be.true;
+    })
+
     it('should be ok', async function () {
         await this.bridge.setBlockMerkleRoot(498, '0x22f00dd154366d758cd3e4fe81c1caed8e0db6227fe4b2b52a8e5a468aa0a723');
         const proof2 = borshifyOutcomeProof(require('./proof2.json'));
