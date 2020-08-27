@@ -35,7 +35,7 @@ contract('TokenLocker 2', function ([_, addr1]) {
         await this.token.mint(this.locker.address, 10000);
     });
 
-    it('should be ok', async function () {
+    it('should not unlock if proof not valid', async function () {
         const proof1 = borshifyOutcomeProof(require('./proof1.json'));
         const lockerBalance = await this.token.balanceOf(this.locker.address);
         console.log(`LOCKER BALANCE ${lockerBalance}`);
