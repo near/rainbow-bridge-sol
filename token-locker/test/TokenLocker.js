@@ -54,3 +54,67 @@ contract('TokenLocker 2', function ([_, addr1]) {
         console.log(`RECEIVER BALANCE ${balance}`);
     });
 })
+
+contract('TokenLocker 3', function ([owner, _]) {
+    beforeEach(async function () {
+        this.token = await MockERC20.new();
+        this.prover = await NearProverRejectMock.new();
+        this.locker = await TokenLocker.new(this.token.address, Buffer.from('nearfuntoken', 'utf-8'), this.prover.address);
+    });
+
+    it('can lock if balance is enough', async function () {
+        const proof1 = borshifyOutcomeProof(require('./proof1.json'));
+        const lockerBalance = await this.token.balanceOf(this.locker.address);
+        console.log(`LOCKER BALANCE ${lockerBalance}`);
+        
+        await this.token.approve(this.locker.address, 10)
+        await this.locker.lockToken(10, 'alice')
+    });
+
+    it('cannot lock if does not approve', async function () {
+        const proof1 = borshifyOutcomeProof(require('./proof1.json'));
+        const lockerBalance = await this.token.balanceOf(this.locker.address);
+        console.log(`LOCKER BALANCE ${lockerBalance}`);
+    
+        let revert = false;
+        try {
+            await this.locker.lockToken(10, 'alice');
+        } catch (e) {
+            expect(e.reason).to.equal('SafeERC20: low-level call failed')
+            revert = true;
+        }
+        expect(revert).to.be.true;
+    })
+
+    it('cannot lock if does not approve enough balance', async function () {
+        const proof1 = borshifyOutcomeProof(require('./proof1.json'));
+        const lockerBalance = await this.token.balanceOf(this.locker.address);
+        console.log(`LOCKER BALANCE ${lockerBalance}`);
+        await this.token.approve(this.locker.address, 9)
+
+        let revert = false;
+        try {
+            await this.locker.lockToken(10, 'alice');
+        } catch (e) {
+            expect(e.reason).to.equal('SafeERC20: low-level call failed')
+            revert = true;
+        }
+        expect(revert).to.be.true;
+    })
+
+    it('cannot lock if does not have enough balance to transfer', async function () {
+        const proof1 = borshifyOutcomeProof(require('./proof1.json'));
+        const lockerBalance = await this.token.balanceOf(this.locker.address);
+        console.log(`LOCKER BALANCE ${lockerBalance}`);
+        await this.token.approve(this.locker.address, 10000000001)
+
+        let revert = false;
+        try {
+            await this.locker.lockToken(10000000001, 'alice');
+        } catch (e) {
+            expect(e.reason).to.equal('SafeERC20: low-level call failed')
+            revert = true;
+        }
+        expect(revert).to.be.true;
+    })
+})
