@@ -1,6 +1,7 @@
 
 const { time } = require('@openzeppelin/test-helpers');
-const { borshify, borshifyInitialValidators } = require('rainbow-bridge-lib/rainbow/borsh')
+const { borshify, borshifyInitialValidators } = require('rainbow-bridge-lib/rainbow/borsh');
+const { expect } = require('chai');
 
 const Ed25519 = artifacts.require('Ed25519');
 const NearBridge = artifacts.require('NearBridge');
@@ -184,3 +185,82 @@ contract('After challenge prev should be revert to prev epoch of latest valid bl
         assert((await this.bridge.head()).epochId == oldEpochId)
     });
 });
+
+contract('Multiple deposit and withdraw test', function ([owner, account1, account2, account3]) {
+    beforeEach(async function () {
+
+    });
+
+    it('multiple deposit is rejected', async function () {
+        this.decoder = await NearDecoder.new();
+        this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
+        let revert = false;
+        try {
+            await this.bridge.deposit({ value: web3.utils.toWei('1') });
+        } catch (e) {
+            revert = true;
+            expect(e.toString()).to.have.string('revert');
+        }
+        expect(revert).to.be.true;
+
+        revert =false;
+        await this.bridge.deposit({ value: web3.utils.toWei('1'), from: account1 });
+        try {
+            await this.bridge.deposit({ value: web3.utils.toWei('1'), from: account1 });
+        } catch (e) {
+            revert = true;
+            expect(e.toString()).to.have.string('revert');
+        }
+        expect(revert).to.be.true;
+    });
+
+    it('deposit from multiple account', async function () {
+        this.decoder = await NearDecoder.new();
+        this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
+        
+        expect((await this.bridge.balanceOf(owner)).toString()).equal(web3.utils.toWei('0'))
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
+        expect((await this.bridge.balanceOf(owner)).toString()).equal(web3.utils.toWei('1'))
+
+        expect((await this.bridge.balanceOf(account1)).toString()).equal(web3.utils.toWei('0'))
+        await this.bridge.deposit({ value: web3.utils.toWei('1'), from: account1 });
+        expect((await this.bridge.balanceOf(account1)).toString()).equal(web3.utils.toWei('1'))
+
+        expect((await this.bridge.balanceOf(account2)).toString()).equal(web3.utils.toWei('0'))
+        await this.bridge.deposit({ value: web3.utils.toWei('1'), from: account2 });
+        expect((await this.bridge.balanceOf(account2)).toString()).equal(web3.utils.toWei('1'))
+    })
+
+    it('fail attempt to withdraw to early', async function () {
+        this.decoder = await NearDecoder.new();
+        this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
+
+        expect((await this.bridge.balanceOf(account1)).toString()).equal(web3.utils.toWei('0'))
+        await this.bridge.deposit({ value: web3.utils.toWei('1'), from: account1 });
+
+        // purpose of this is to update head.validateAfter so that later withdraw txn's block.timestamp <= head.validAfter
+        {
+            // Get "initial validators" that will produce block 304
+            const block244 = require('./244.json');
+            const initialValidators = block244.next_bps;
+
+            const block304 = require('./304.json');
+            block304.inner_lite.timestamp_nanosec = await time.latest()
+            await this.bridge.initWithValidators(borshifyInitialValidators(initialValidators));
+            await this.bridge.initWithBlock(borshify(block304));
+            await this.bridge.blockHashes(304); 
+        }
+
+        let revert = false;
+        try {
+            // only head.submitter is required to withdraw after lock period
+            await this.bridge.withdraw({from: owner})
+        } catch (e) {
+            revert = true;
+            expect(e.toString()).to.have.string('revert');
+        }
+        expect(revert).to.be.true;
+        expect((await this.bridge.balanceOf(account1)).toString()).equal(web3.utils.toWei('1'))
+    })
+})
