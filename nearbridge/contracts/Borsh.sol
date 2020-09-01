@@ -67,7 +67,9 @@ library Borsh {
     }
 
     function decodeI16(Data memory data) internal pure returns(int16 value) {
-        value = int16(decodeI8(data));
+        // must decode lower byte as u8 to avoid extend sign bit
+        // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=6c1c1700c408a16e251d1635f6194640
+        value = int16(decodeU8(data));
         value |= (int16(decodeI8(data)) << 8);
     }
 
@@ -77,7 +79,7 @@ library Borsh {
     }
 
     function decodeI32(Data memory data) internal pure returns(int32 value) {
-        value = int32(decodeI16(data));
+        value = int32(decodeU16(data));
         value |= (int32(decodeI16(data)) << 16);
     }
 
@@ -87,7 +89,7 @@ library Borsh {
     }
 
     function decodeI64(Data memory data) internal pure returns(int64 value) {
-        value = int64(decodeI32(data));
+        value = int64(decodeU32(data));
         value |= (int64(decodeI32(data)) << 32);
     }
 
@@ -97,7 +99,7 @@ library Borsh {
     }
 
     function decodeI128(Data memory data) internal pure returns(int128 value) {
-        value = int128(decodeI64(data));
+        value = int128(decodeU64(data));
         value |= (int128(decodeI64(data)) << 64);
     }
 
@@ -107,7 +109,7 @@ library Borsh {
     }
 
     function decodeI256(Data memory data) internal pure returns(int256 value) {
-        value = int256(decodeI128(data));
+        value = int256(decodeU128(data));
         value |= (int256(decodeI128(data)) << 128);
     }
 
