@@ -8,7 +8,7 @@ import "./NearDecoder.sol";
 import "./Ed25519.sol";
 
 
-contract NearBridge is INearBridge {
+contract NearBridge is INearBridge, Ownable {
     using SafeMath for uint256;
     using Borsh for Borsh.Data;
     using NearDecoder for Borsh.Data;
@@ -153,7 +153,7 @@ contract NearBridge is INearBridge {
     }
 
     // The first part of initialization -- setting the validators of the current epoch.
-    function initWithValidators(bytes memory _initialValidators) public {
+    function initWithValidators(bytes memory _initialValidators) public onlyOwner {
         require(!initialized, "NearBridge: already initialized");
         Borsh.Data memory initialValidatorsBorsh = Borsh.from(_initialValidators);
         NearDecoder.InitialValidators memory initialValidators = initialValidatorsBorsh.decodeInitialValidators();
@@ -174,7 +174,7 @@ contract NearBridge is INearBridge {
     }
 
     // The second part of the initialization -- setting the current head.
-    function initWithBlock(bytes memory data) public {
+    function initWithBlock(bytes memory data) public onlyOwner {
         require(currentBlockProducers.totalStake > 0, "NearBridge: validators need to be initialized first");
         require(!initialized, "NearBridge: already initialized");
         initialized = true;
