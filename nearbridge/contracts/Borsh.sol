@@ -20,7 +20,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
+        require(data.raw.length >= data.offset.add(size), "Borsh: Out of range");
         _;
         data.offset += size;
     }
@@ -34,9 +34,20 @@ library Borsh {
     }
 
     function bytesKeccak256(bytes memory ptr, uint256 offset, uint256 length) internal pure returns(bytes32 res) {
+        uint256 ptr2;
+        uint256 ptr1;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
-            res := keccak256(add(add(ptr, 32), offset), length)
+            ptr1 := ptr
+            ptr2 := add(add(ptr, 32), offset)
+        }
+        
+        require(ptr2 > ptr1, "Borsh: bytesKeccak256: Overflow");
+        require(ptr.length >= ptr2.add(length) - ptr1, "Borsh: bytesKeccak256: Out of range");
+
+        // solium-disable-next-line security/no-inline-assembly
+        assembly {
+            res := keccak256(ptr2, length)
         }
     }
 
