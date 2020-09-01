@@ -1,7 +1,7 @@
 
 const { time } = require('@openzeppelin/test-helpers');
 const { borshify, borshifyInitialValidators } = require('rainbow-bridge-lib/rainbow/borsh');
-const { expect } = require('chai');
+const { expect, assert } = require('chai');
 const { web3 } = require('@openzeppelin/test-helpers/src/setup');
 
 const Ed25519 = artifacts.require('Ed25519');
@@ -349,6 +349,7 @@ contract('Multiple deposit and withdraw test', function ([owner, account1, accou
         expect((await this.bridge.balanceOf(account1)).toString()).equal(web3.utils.toWei('0'))
         let newBalance = await web3.eth.getBalance(account2)
         // but deposit lockAmount has additional gas refund, sometimes it is slightly more than 0.5xlockAmount
+        expect(newBalance - oldBalance >= web3.utils.toWei('0.5')).to.be.true
         expect((newBalance - oldBalance - web3.utils.toWei('0.5')) / web3.utils.toWei('0.5')).lessThan(0.00001)
     });
 })
