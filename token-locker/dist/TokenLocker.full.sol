@@ -987,12 +987,6 @@ contract TokenLocker {
         emit Locked(address(ethToken_), msg.sender, amount, accountId);
     }
 
-        function lockToken2(uint256 amount, string memory accountId) public {
-        emit Locked(address(ethToken_), msg.sender, amount, accountId);
-        //        ethToken_.safeTransferFrom(msg.sender, address(this), amount);
-
-    }
-
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
         require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
