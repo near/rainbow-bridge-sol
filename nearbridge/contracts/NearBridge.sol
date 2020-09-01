@@ -83,17 +83,23 @@ contract NearBridge is INearBridge, Ownable {
     }
 
     function deposit() public payable {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.value == lockEthAmount && balanceOf[msg.sender] == 0);
         balanceOf[msg.sender] = balanceOf[msg.sender].add(msg.value);
     }
 
     function withdraw() public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.sender != head.submitter || block.timestamp > head.validAfter);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(lockEthAmount);
         msg.sender.transfer(lockEthAmount);
     }
 
     function challenge(address payable receiver, uint256 signatureIndex) public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(block.timestamp < head.validAfter, "Lock period already passed");
 
         require(
@@ -105,6 +111,8 @@ contract NearBridge is INearBridge, Ownable {
     }
 
     function checkBlockProducerSignatureInHead(uint256 signatureIndex) public view returns(bool) {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         if (head.approvals_after_next[signatureIndex].none) {
             return true;
         }
