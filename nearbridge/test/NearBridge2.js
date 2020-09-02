@@ -16,7 +16,6 @@ contract('NearBridge2', function ([_, addr1]) {
     beforeEach(async function () {
         this.decoder = await NearDecoder.new();
         this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(10));
-        await this.bridge.deposit({ value: web3.utils.toWei('1') });
     });
 
     it('should be ok', async function () {
@@ -27,6 +26,8 @@ contract('NearBridge2', function ([_, addr1]) {
         await this.bridge.initWithValidators(borshifyInitialValidators(require('./block_9605.json').next_bps));
         await this.bridge.initWithBlock(block9605);
         await this.bridge.blockHashes(9605);
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
+
         expect(await this.bridge.blockHashes(9605)).to.be.equal(
             '0xc4770276d5e782d847ea3ce0674894a572df3ea75b960ff57d66395df0eb2a34',
         );
@@ -42,7 +43,6 @@ contract('NearBridge2', function ([_, addr1]) {
 //    beforeEach(async function () {
 //        this.decoder = await NearDecoder.new();
 //        this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(10));
-//        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 //    });
 //
 //    it('should be ok', async function () {
@@ -52,6 +52,7 @@ contract('NearBridge2', function ([_, addr1]) {
 //        await this.bridge.initWithValidators(borshifyInitialValidators(require('./init_validators_12640118.json').next_bps));
 //        await this.bridge.initWithBlock(block_12640118);
 //        await this.bridge.blockHashes(12640118);
+//        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 //        await this.bridge.addLightClientBlock(block_12640218);
 //    });
 //});
@@ -64,7 +65,6 @@ contract('Add second block in first epoch should be verifiable', function ([_, a
     it('should be ok', async function () {
         this.decoder = await NearDecoder.new();
         this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
-        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         // Get "initial validators" that will produce block 304
         const block244 = require('./244.json');
@@ -76,6 +76,8 @@ contract('Add second block in first epoch should be verifiable', function ([_, a
         await this.bridge.initWithValidators(borshifyInitialValidators(initialValidators));
         await this.bridge.initWithBlock(borshify(block304));
         await this.bridge.blockHashes(304);
+
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         let now = await time.latest();
         await timeIncreaseTo(now.add(time.duration.seconds(3600)));
@@ -99,7 +101,6 @@ contract('Test adding blocks in new epoch when bps change', function ([_, addr1]
     it('should be ok', async function () {
         this.decoder = await NearDecoder.new();
         this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
-        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         const block181 = require('./181.json');
         const block244 = require('./244.json');
@@ -111,6 +112,8 @@ contract('Test adding blocks in new epoch when bps change', function ([_, addr1]
         await this.bridge.initWithValidators(borshifyInitialValidators(block181.next_bps));
         await this.bridge.initWithBlock(borshify(block244));
         await this.bridge.blockHashes(244);
+
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         let now = await time.latest();
         await timeIncreaseTo(now.add(time.duration.seconds(3600)));
@@ -146,7 +149,6 @@ contract('After challenge prev should be revert to prev epoch of latest valid bl
     it('should be ok', async function () {
         this.decoder = await NearDecoder.new();
         this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
-        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         const block181 = require('./181.json');
         const block244 = require('./244.json');
@@ -158,6 +160,8 @@ contract('After challenge prev should be revert to prev epoch of latest valid bl
         await this.bridge.initWithValidators(borshifyInitialValidators(block181.next_bps));
         await this.bridge.initWithBlock(borshify(block244));
         await this.bridge.blockHashes(244);
+
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         let now = await time.latest();
         await timeIncreaseTo(now.add(time.duration.seconds(3600)));
