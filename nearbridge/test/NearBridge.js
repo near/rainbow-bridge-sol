@@ -21,7 +21,6 @@ contract('NearBridge', function ([_, addr1]) {
     it('should be ok', async function () {
         this.decoder = await NearDecoder.new();
         this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(3600));
-        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         const block120998 = borshify(require('./block_120998.json'));
         const block121498 = borshify(require('./block_121498.json'));
@@ -35,6 +34,8 @@ contract('NearBridge', function ([_, addr1]) {
         expect(await this.bridge.blockHashes(120998)).to.be.equal(
             '0x1a7a07b5eee1f4d8d7e47864d533143972f858464bacdc698774d167fb1b40e6',
         );
+
+        await this.bridge.deposit({ value: web3.utils.toWei('1') });
 
         // http post http://127.0.0.1:3030/ jsonrpc=2.0 method=next_light_client_block params:='["2nMXQQPwni4nAatuH9i1kSiC2i8ivUmCx1QhTnu2TNEZ"]' id="dontcare"
         await this.bridge.addLightClientBlock(block121498);
@@ -65,7 +66,7 @@ contract('NearBridge', function ([_, addr1]) {
         it('ok with many block headers', async function () {
             this.decoder = await NearDecoder.new();
             this.bridge = await NearBridge.new((await Ed25519.deployed()).address, web3.utils.toBN(1e18), web3.utils.toBN(10));
-            await this.bridge.deposit({ value: web3.utils.toWei('1') });
+
             this.timeout(0);
             const blockFiles = await fs.readdir(process.env.NEAR_HEADERS_DIR);
             blockFiles.sort((a, b) => Number(a.split('.')[0]) < Number(b.split('.')[0]));
@@ -75,6 +76,9 @@ contract('NearBridge', function ([_, addr1]) {
             await this.bridge.initWithValidators(borshifyInitialValidators(firstBlock.next_bps));
             await this.bridge.initWithBlock(firstBlockBorsh);
             await this.bridge.blockHashes(firstBlock.inner_lite.height);
+
+            await this.bridge.deposit({ value: web3.utils.toWei('1') });
+
             expect(await this.bridge.blockHashes(firstBlock.inner_lite.height)).to.be.a('string');
 
             for (let i = 1; i < blockFiles.length; i++) {

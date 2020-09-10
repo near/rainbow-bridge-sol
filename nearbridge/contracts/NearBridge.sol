@@ -8,7 +8,7 @@ import "./NearDecoder.sol";
 import "./Ed25519.sol";
 
 
-contract NearBridge is INearBridge {
+contract NearBridge is INearBridge, Ownable {
     using SafeMath for uint256;
     using Borsh for Borsh.Data;
     using NearDecoder for Borsh.Data;
@@ -83,17 +83,23 @@ contract NearBridge is INearBridge {
     }
 
     function deposit() public payable {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.value == lockEthAmount && balanceOf[msg.sender] == 0);
         balanceOf[msg.sender] = balanceOf[msg.sender].add(msg.value);
     }
 
     function withdraw() public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.sender != head.submitter || block.timestamp > head.validAfter);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(lockEthAmount);
         msg.sender.transfer(lockEthAmount);
     }
 
     function challenge(address payable receiver, uint256 signatureIndex) public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(block.timestamp < head.validAfter, "Lock period already passed");
 
         require(
@@ -105,6 +111,8 @@ contract NearBridge is INearBridge {
     }
 
     function checkBlockProducerSignatureInHead(uint256 signatureIndex) public view returns(bool) {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         if (head.approvals_after_next[signatureIndex].none) {
             return true;
         }
@@ -153,7 +161,7 @@ contract NearBridge is INearBridge {
     }
 
     // The first part of initialization -- setting the validators of the current epoch.
-    function initWithValidators(bytes memory _initialValidators) public {
+    function initWithValidators(bytes memory _initialValidators) public onlyOwner {
         require(!initialized, "NearBridge: already initialized");
         Borsh.Data memory initialValidatorsBorsh = Borsh.from(_initialValidators);
         NearDecoder.InitialValidators memory initialValidators = initialValidatorsBorsh.decodeInitialValidators();
@@ -174,7 +182,7 @@ contract NearBridge is INearBridge {
     }
 
     // The second part of the initialization -- setting the current head.
-    function initWithBlock(bytes memory data) public {
+    function initWithBlock(bytes memory data) public onlyOwner {
         require(currentBlockProducers.totalStake > 0, "NearBridge: validators need to be initialized first");
         require(!initialized, "NearBridge: already initialized");
         initialized = true;

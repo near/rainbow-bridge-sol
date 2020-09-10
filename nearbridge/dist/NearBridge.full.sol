@@ -319,7 +319,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
+        require(data.raw.length >= data.offset.add(size), "Borsh: Out of range");
         _;
         data.offset += size;
     }
@@ -333,9 +333,20 @@ library Borsh {
     }
 
     function bytesKeccak256(bytes memory ptr, uint256 offset, uint256 length) internal pure returns(bytes32 res) {
+        uint256 ptr2;
+        uint256 ptr1;
         // solium-disable-next-line security/no-inline-assembly
         assembly {
-            res := keccak256(add(add(ptr, 32), offset), length)
+            ptr1 := ptr
+            ptr2 := add(add(ptr, 32), offset)
+        }
+        
+        require(ptr2 > ptr1, "Borsh: bytesKeccak256: Overflow");
+        require(ptr.length >= ptr2.add(length) - ptr1, "Borsh: bytesKeccak256: Out of range");
+
+        // solium-disable-next-line security/no-inline-assembly
+        assembly {
+            res := keccak256(ptr2, length)
         }
     }
 
@@ -366,7 +377,9 @@ library Borsh {
     }
 
     function decodeI16(Data memory data) internal pure returns(int16 value) {
-        value = int16(decodeI8(data));
+        // must decode lower byte as u8 to avoid extend sign bit
+        // see https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=6c1c1700c408a16e251d1635f6194640
+        value = int16(decodeU8(data));
         value |= (int16(decodeI8(data)) << 8);
     }
 
@@ -376,7 +389,7 @@ library Borsh {
     }
 
     function decodeI32(Data memory data) internal pure returns(int32 value) {
-        value = int32(decodeI16(data));
+        value = int32(decodeU16(data));
         value |= (int32(decodeI16(data)) << 16);
     }
 
@@ -386,7 +399,7 @@ library Borsh {
     }
 
     function decodeI64(Data memory data) internal pure returns(int64 value) {
-        value = int64(decodeI32(data));
+        value = int64(decodeU32(data));
         value |= (int64(decodeI32(data)) << 32);
     }
 
@@ -396,7 +409,7 @@ library Borsh {
     }
 
     function decodeI128(Data memory data) internal pure returns(int128 value) {
-        value = int128(decodeI64(data));
+        value = int128(decodeU64(data));
         value |= (int128(decodeI64(data)) << 64);
     }
 
@@ -406,7 +419,7 @@ library Borsh {
     }
 
     function decodeI256(Data memory data) internal pure returns(int256 value) {
-        value = int256(decodeI128(data));
+        value = int256(decodeU128(data));
         value |= (int256(decodeI128(data)) << 128);
     }
 
@@ -1820,7 +1833,7 @@ pragma experimental ABIEncoderV2; // solium-disable-line no-experimental
 
 
 
-contract NearBridge is INearBridge {
+contract NearBridge is INearBridge, Ownable {
     using SafeMath for uint256;
     using Borsh for Borsh.Data;
     using NearDecoder for Borsh.Data;
@@ -1895,17 +1908,23 @@ contract NearBridge is INearBridge {
     }
 
     function deposit() public payable {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.value == lockEthAmount && balanceOf[msg.sender] == 0);
         balanceOf[msg.sender] = balanceOf[msg.sender].add(msg.value);
     }
 
     function withdraw() public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(msg.sender != head.submitter || block.timestamp > head.validAfter);
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(lockEthAmount);
         msg.sender.transfer(lockEthAmount);
     }
 
     function challenge(address payable receiver, uint256 signatureIndex) public {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         require(block.timestamp < head.validAfter, "Lock period already passed");
 
         require(
@@ -1917,6 +1936,8 @@ contract NearBridge is INearBridge {
     }
 
     function checkBlockProducerSignatureInHead(uint256 signatureIndex) public view returns(bool) {
+        require(initialized, "NearBridge: Contract is not initialized.");
+
         if (head.approvals_after_next[signatureIndex].none) {
             return true;
         }
@@ -1965,7 +1986,7 @@ contract NearBridge is INearBridge {
     }
 
     // The first part of initialization -- setting the validators of the current epoch.
-    function initWithValidators(bytes memory _initialValidators) public {
+    function initWithValidators(bytes memory _initialValidators) public onlyOwner {
         require(!initialized, "NearBridge: already initialized");
         Borsh.Data memory initialValidatorsBorsh = Borsh.from(_initialValidators);
         NearDecoder.InitialValidators memory initialValidators = initialValidatorsBorsh.decodeInitialValidators();
@@ -1986,7 +2007,7 @@ contract NearBridge is INearBridge {
     }
 
     // The second part of the initialization -- setting the current head.
-    function initWithBlock(bytes memory data) public {
+    function initWithBlock(bytes memory data) public onlyOwner {
         require(currentBlockProducers.totalStake > 0, "NearBridge: validators need to be initialized first");
         require(!initialized, "NearBridge: already initialized");
         initialized = true;
