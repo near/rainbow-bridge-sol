@@ -72,6 +72,13 @@ contract TokenLocker {
         ethToken_.safeTransfer(result.recipient, result.amount);
         emit Unlocked(result.amount, result.recipient);
     }
+    
+    // tokenFallback implements the ContractReceiver interface from ERC223-token-standard.
+    // This allows to support ERC223 tokens with no extra cost.
+    // The function always passes: we don't need to make any decision and the contract always
+    // accept token transfers transfer. 
+    // TODO: we could reject transfers if `msg.sender` is not `address(this)`.
+    function tokenFallback(address _from, uint _value, bytes _data) public pure {}
 
     // TokenLocker is linked to the fungible token on Ethereum side and mintable fungible
     // token on NEAR side, it also links to the prover that it uses to unlock the tokens.
