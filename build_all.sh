@@ -10,3 +10,7 @@ cd nearbridge
 echo "Building NearOnEthProver contract"
 cd ../nearprover
 ./dist.sh
+
+echo "Building token locker"
+cd ../token-locker
+./dist.sh
