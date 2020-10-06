@@ -54,7 +54,7 @@ library ProofDecoder {
                                     /// transaction was converted to a receipt. Contains the receipt_id of the generated receipt.
     }
 
-    function decodeExecutionStatus(Borsh.Data memory data) internal pure returns(ExecutionStatus memory executionStatus) {
+    function decodeExecutionStatus(Borsh.Data memory data) internal view returns(ExecutionStatus memory executionStatus) {
         executionStatus.enumIndex = data.decodeU8();
         if (executionStatus.enumIndex == 0) {
             executionStatus.unknown = true;
@@ -91,7 +91,7 @@ library ProofDecoder {
             outcome.logs[i] = data.decodeBytes();
         }
 
-        uint256 start = data.offset;
+        uint256 start = data.ptr;
         outcome.receipt_ids = new bytes32[](data.decodeU32());
         for (uint i = 0; i < outcome.receipt_ids.length; i++) {
             outcome.receipt_ids[i] = data.decodeBytes32();
@@ -100,12 +100,9 @@ library ProofDecoder {
         outcome.tokens_burnt = data.decodeU128();
         outcome.executor_id = data.decodeBytes();
         outcome.status = data.decodeExecutionStatus();
-        uint256 stop = data.offset;
 
         outcome.merkelization_hashes = new bytes32[](1 + outcome.logs.length);
-        data.offset = start;
-        outcome.merkelization_hashes[0] = data.peekSha256(stop - start);
-        data.offset = stop;
+        outcome.merkelization_hashes[0] = Utils.sha256Raw(start, data.ptr - start);
         for (uint i = 0; i < outcome.logs.length; i++) {
             outcome.merkelization_hashes[i + 1] = sha256(outcome.logs[i]);
         }
@@ -125,10 +122,7 @@ library ProofDecoder {
         uint256 len = 1 + outcome.outcome.merkelization_hashes.length;
         outcome.hash = sha256(
             abi.encodePacked(
-                uint8((len >> 0) & 0xFF),
-                uint8((len >> 8) & 0xFF),
-                uint8((len >> 16) & 0xFF),
-                uint8((len >> 24) & 0xFF),
+                Utils.swapBytes4(uint32(len)),
                 outcome.id,
                 outcome.outcome.merkelization_hashes
             )
@@ -140,7 +134,7 @@ library ProofDecoder {
         uint8 direction; // 0 = left, 1 = right
     }
 
-    function decodeMerklePathItem(Borsh.Data memory data) internal pure returns(MerklePathItem memory item) {
+    function decodeMerklePathItem(Borsh.Data memory data) internal view returns(MerklePathItem memory item) {
         item.hash = data.decodeBytes32();
         item.direction = data.decodeU8();
         require(item.direction < 2, "ProofDecoder: MerklePathItem direction should be 0 or 1");
@@ -150,7 +144,7 @@ library ProofDecoder {
         MerklePathItem[] items;
     }
 
-    function decodeMerklePath(Borsh.Data memory data) internal pure returns(MerklePath memory path) {
+    function decodeMerklePath(Borsh.Data memory data) internal view returns(MerklePath memory path) {
         path.items = new MerklePathItem[](data.decodeU32());
         for (uint i = 0; i < path.items.length; i++) {
             path.items[i] = data.decodeMerklePathItem();
