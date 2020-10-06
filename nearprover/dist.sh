@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Exit script as soon as a command fails.
-set -e
+set -aex
 
 yarn
 
@@ -16,7 +16,7 @@ do
   contract_name="${filename%.*}"
   node_modules/.bin/truffle-flattener "./contracts/${contract_name}.sol" > "dist/${contract_name}.full.sol"
   # Fix for https://github.com/nomiclabs/truffle-flattener/issues/55
-  sed -i '/^\/\/ SPDX-License-Identifier:/d' "dist/${contract_name}.full.sol"
+  sed -i '' '/^\/\/ SPDX-License-Identifier:/d' "dist/${contract_name}.full.sol"
   yarn run solcjs --bin --abi --optimize "dist/${contract_name}.full.sol" -o "dist"
   mv "dist/dist_${contract_name}_full_sol_${contract_name}.abi" "dist/${contract_name}.full.abi"
   mv "dist/dist_${contract_name}_full_sol_${contract_name}.bin" "dist/${contract_name}.full.bin"
