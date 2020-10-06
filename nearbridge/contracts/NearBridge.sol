@@ -12,16 +12,11 @@ contract NearBridge is INearBridge {
     using Borsh for Borsh.Data;
     using NearDecoder for Borsh.Data;
 
-    struct BlockProducer {
-        NearDecoder.PublicKey publicKey;
-        uint128 stake;
-    }
-
     // Information about the block producers of a certain epoch.
     struct BlockProducerInfo {
         uint256 bpsLength;
         uint256 totalStake;
-        mapping(uint256 => BlockProducer) bps;
+        mapping(uint256 => NearDecoder.BlockProducer) bps;
     }
 
     // Minimal information about the submitted block.
@@ -117,7 +112,7 @@ contract NearBridge is INearBridge {
             = untrustedHeadIsFromNextEpoch
             ? nextBlockProducers : currentBlockProducers;
         require(signatureIndex < untrustedBlockProducers.bpsLength, "Signature index out of range");
-        require(!untrustedApprovals[signatureIndex].none, "This signature was skipped");
+        require(untrustedApprovals[signatureIndex].some, "This signature was skipped");
         return _checkValidatorSignature(
             untrustedHead.height,
             untrustedHead.next_hash,
@@ -141,14 +136,14 @@ contract NearBridge is INearBridge {
     }
 
     // The first part of initialization -- setting the validators of the current epoch.
-    function initWithValidators(bytes memory initialValidators_) override public {
+    function initWithValidators(bytes memory data) override public {
         require(!initialized, "NearBridge: already initialized");
 
-        Borsh.Data memory initialValidatorsBorsh = Borsh.from(initialValidators_);
-        NearDecoder.InitialValidators memory initialValidators = initialValidatorsBorsh.decodeInitialValidators();
-        require(initialValidatorsBorsh.finished(), "NearBridge: only initial validators should be passed as second argument");
+        Borsh.Data memory borsh = Borsh.from(data);
+        NearDecoder.BlockProducer[] memory initialValidators = borsh.decodeBlockProducers();
+        borsh.done();
 
-        setBlockProducers(initialValidators.validator_stakes, currentBlockProducers);
+        setBlockProducers(initialValidators, currentBlockProducers);
     }
 
     // The second part of the initialization -- setting the current head.
@@ -159,11 +154,11 @@ contract NearBridge is INearBridge {
 
         Borsh.Data memory borsh = Borsh.from(data);
         NearDecoder.LightClientBlock memory nearBlock = borsh.decodeLightClientBlock();
-        require(borsh.finished(), "NearBridge: only light client block should be passed as first argument");
+        borsh.done();
 
-        require(!nearBlock.next_bps.none, "NearBridge: Initialization block should contain next_bps.");
+        require(nearBlock.next_bps.some, "NearBridge: Initialization block should contain next_bps.");
         setBlock(nearBlock, head);
-        setBlockProducers(nearBlock.next_bps.validatorStakes, nextBlockProducers);
+        setBlockProducers(nearBlock.next_bps.blockProducers, nextBlockProducers);
         blockHashes_[head.height] = head.hash;
         blockMerkleRoots_[head.height] = head.merkleRoot;
     }
@@ -173,7 +168,7 @@ contract NearBridge is INearBridge {
 
         uint256 votedFor = 0;
         for (uint i = 0; i < bpInfo.bpsLength; i++) {
-            if (!nearBlock.approvals_after_next[i].none) {
+            if (nearBlock.approvals_after_next[i].some) {
                 // Assume presented signatures are valid, but this could be challenged
                 votedFor = votedFor.add(bpInfo.bps[i].stake);
             }
@@ -210,7 +205,7 @@ contract NearBridge is INearBridge {
 
         Borsh.Data memory borsh = Borsh.from(data);
         NearDecoder.LightClientBlock memory nearBlock = borsh.decodeLightClientBlock();
-        require(borsh.finished(), "NearBridge: only light client block should be passed");
+        borsh.done();
 
         // Commit the previous block, or make sure that it is OK to replace it.
         if (block.timestamp >= lastValidAt) {
@@ -243,7 +238,7 @@ contract NearBridge is INearBridge {
         // If the block is from the next epoch, make sure that next_bps is supplied and has a correct hash.
         if (nearBlockIsFromNextEpoch) {
             require(
-                !nearBlock.next_bps.none,
+                nearBlock.next_bps.some,
                 "NearBridge: Next next_bps should not be None"
             );
             require(
@@ -259,7 +254,7 @@ contract NearBridge is INearBridge {
         }
         untrustedHeadIsFromNextEpoch = nearBlockIsFromNextEpoch;
         if (nearBlockIsFromNextEpoch) {
-            setBlockProducers(nearBlock.next_bps.validatorStakes, untrustedNextBlockProducers);
+            setBlockProducers(nearBlock.next_bps.blockProducers, untrustedNextBlockProducers);
         }
         lastSubmitter = msg.sender;
         lastValidAt = block.timestamp.add(lockDuration);
@@ -280,14 +275,11 @@ contract NearBridge is INearBridge {
         );
     }
 
-    function setBlockProducers(NearDecoder.ValidatorStake[] memory src, BlockProducerInfo storage dest) internal {
+    function setBlockProducers(NearDecoder.BlockProducer[] memory src, BlockProducerInfo storage dest) internal {
         dest.bpsLength = src.length;
         uint256 totalStake = 0;
         for (uint i = 0; i < src.length; i++) {
-            dest.bps[i] = BlockProducer({
-                publicKey: src[i].public_key,
-                stake: src[i].stake
-            });
+            dest.bps[i] = src[i];
             totalStake = totalStake.add(src[i].stake);
         }
         dest.totalStake = totalStake;
@@ -322,40 +314,10 @@ contract NearBridge is INearBridge {
         bytes32 next_block_hash,
         NearDecoder.Signature memory signature,
         NearDecoder.PublicKey storage publicKey
-    ) internal view returns(bool) {
-        bytes memory message = abi.encodePacked(uint8(0), next_block_hash, _reversedUint64(height + 2), bytes23(0));
-
-        if (signature.enumIndex == 0) {
-            (bytes32 arg1, bytes9 arg2) = abi.decode(message, (bytes32, bytes9));
-            return publicKey.ed25519.xy != bytes32(0) && edwards.check(
-                publicKey.ed25519.xy,
-                signature.ed25519.rs[0],
-                signature.ed25519.rs[1],
-                arg1,
-                arg2
-            );
-        }
-        else {
-            return ecrecover(
-                keccak256(message),
-                signature.secp256k1.v + (signature.secp256k1.v < 27 ? 27 : 0),
-                signature.secp256k1.r,
-                signature.secp256k1.s
-                ) == address(uint256(keccak256(abi.encodePacked(
-                publicKey.secp256k1.x,
-                publicKey.secp256k1.y
-            ))));
-        }
-    }
-
-    function _reversedUint64(uint64 data) private pure returns(uint64 r) {
-        r = data;
-        r = ((r & 0x00000000FFFFFFFF) << 32) |
-            ((r & 0xFFFFFFFF00000000) >> 32);
-        r = ((r & 0x0000FFFF0000FFFF) << 16) |
-            ((r & 0xFFFF0000FFFF0000) >> 16);
-        r = ((r & 0x00FF00FF00FF00FF) << 8) |
-            ((r & 0xFF00FF00FF00FF00) >> 8);
+    ) internal view returns (bool) {
+        bytes memory message = abi.encodePacked(uint8(0), next_block_hash, Utils.swapBytes8(height + 2), bytes23(0));
+        (bytes32 arg1, bytes9 arg2) = abi.decode(message, (bytes32, bytes9));
+        return edwards.check(publicKey.k, signature.r, signature.s, arg1, arg2);
     }
 
     function blockHashes(uint64 height) override public view returns (bytes32 res) {
