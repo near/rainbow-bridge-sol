@@ -43,10 +43,14 @@ contract NearProver is INearProver {
 
         bytes32 expectedBlockMerkleRoot = bridge.blockMerkleRoots(blockHeight);
 
-        require(
-            _computeRoot(fullOutcomeProof.block_header_lite.hash, fullOutcomeProof.block_proof) == expectedBlockMerkleRoot, "NearProver: block proof is not valid"
-        );
-
+        if (expectedBlockMerkleRoot != fullOutcomeProof.block_header_lite.inner_lite.block_merkle_root) {
+            require(
+                _computeRoot(fullOutcomeProof.block_header_lite.hash, fullOutcomeProof.block_proof) == expectedBlockMerkleRoot, "NearProver: block proof is not valid"
+            );
+        }
+        else {
+            require(fullOutcomeProof.block_header_lite.hash == bridge.blockHashes(blockHeight), "NearProver: block proof is not valid");
+        }
         return true;
     }
 
