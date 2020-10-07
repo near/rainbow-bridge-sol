@@ -5,12 +5,6 @@ steps:
       source ~/.yarn/yarn.sh
       yarn
       yarn build
-      git status
-      changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
-      if [ $$changed_files -gt 0 ]; then
-        echo 'contract changed, please rebuild contract'
-        exit 1
-      fi
     label: 'build all solidity contracts'
     agents:
       - 'queue=medium'
